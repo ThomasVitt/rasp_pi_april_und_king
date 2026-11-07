@@ -1,0 +1,159 @@
+---
+- name: Home Assistant (Docker) und WireGuard auf Raspberry Pi OS Lite
+  hosts: raspi
+  become: true
+
+  tasks:
+    # ---------- Basis ----------
+    - name: Zeitzone setzen
+      community.general.timezone:
+        name: "{{ timezone }}"
+
+    - name: Apt-Cache aktualisieren und System upgraden
+      ansible.builtin.apt:
+        update_cache: true
+        upgrade: dist
+        cache_valid_time: 3600
+
+    - name: Benötigte Pakete installieren
+      ansible.builtin.apt:
+        name:
+          - ca-certificates
+          - curl
+          - gnupg
+          - apparmor
+          - libcap2-bin
+          - iptables
+          - wireguard
+          - wireguard-tools
+          - python3-docker
+        state: present
+
+    # ---------- Docker ----------
+    - name: Docker-GPG-Key ablegen
+      ansible.builtin.get_url:
+        url: https://download.docker.com/linux/debian/gpg
+        dest: /etc/apt/keyrings/docker.asc
+        mode: "0644"
+
+    - name: Docker-Repository hinzufügen
+      ansible.builtin.apt_repository:
+        repo: >-
+          deb [arch={{ 'arm64' if ansible_architecture == 'aarch64' else 'armhf' }}
+          signed-by=/etc/apt/keyrings/docker.asc]
+          https://download.docker.com/linux/debian
+          {{ ansible_distribution_release }} stable
+        filename: docker
+        state: present
+
+    - name: Docker installieren
+      ansible.builtin.apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-compose-plugin
+        state: present
+        update_cache: true
+
+    - name: Docker aktivieren und starten
+      ansible.builtin.service:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: Benutzer zur docker-Gruppe hinzufügen
+      ansible.builtin.user:
+        name: "{{ ansible_user }}"
+        groups: docker
+        append: true
+
+    # ---------- Home Assistant ----------
+    - name: Config-Verzeichnis für Home Assistant anlegen
+      ansible.builtin.file:
+        path: "{{ ha_config_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Home Assistant Container starten
+      community.docker.docker_container:
+        name: homeassistant
+        image: "{{ ha_image }}"
+        pull: true
+        state: started
+        restart_policy: unless-stopped
+        network_mode: host
+        privileged: true          # nötig für USB-Sticks (Zigbee/Z-Wave) und Bluetooth
+        env:
+          TZ: "{{ timezone }}"
+        volumes:
+          - "{{ ha_config_dir }}:/config"
+          - /etc/localtime:/etc/localtime:ro
+          - /run/dbus:/run/dbus:ro
+
+    # ---------- WireGuard ----------
+    - name: IP-Forwarding aktivieren
+      ansible.posix.sysctl:
+        name: net.ipv4.ip_forward
+        value: "1"
+        sysctl_set: true
+        state: present
+        reload: true
+
+    - name: WireGuard-Verzeichnis absichern
+      ansible.builtin.file:
+        path: /etc/wireguard
+        state: directory
+        mode: "0700"
+
+    - name: Server-Private-Key generieren (nur falls nicht vorhanden)
+      ansible.builtin.shell: umask 077 && wg genkey > /etc/wireguard/server_private.key
+      args:
+        creates: /etc/wireguard/server_private.key
+
+    - name: Server-Public-Key ableiten
+      ansible.builtin.shell: wg pubkey < /etc/wireguard/server_private.key > /etc/wireguard/server_public.key
+      args:
+        creates: /etc/wireguard/server_public.key
+
+    - name: Private Key einlesen
+      ansible.builtin.slurp:
+        src: /etc/wireguard/server_private.key
+      register: wg_private_key_raw
+      no_log: true
+
+    - name: Public Key einlesen
+      ansible.builtin.slurp:
+        src: /etc/wireguard/server_public.key
+      register: wg_public_key_raw
+
+    - name: WireGuard-Konfiguration schreiben
+      ansible.builtin.template:
+        src: wg0.conf.j2
+        dest: "/etc/wireguard/{{ wg_interface }}.conf"
+        owner: root
+        group: root
+        mode: "0600"
+      vars:
+        wg_private_key: "{{ wg_private_key_raw.content | b64decode | trim }}"
+      no_log: true
+      notify: Restart WireGuard
+
+    - name: WireGuard beim Booten aktivieren und starten
+      ansible.builtin.service:
+        name: "wg-quick@{{ wg_interface }}"
+        state: started
+        enabled: true
+
+    - name: Hinweise ausgeben
+      ansible.builtin.debug:
+        msg:
+          - "Home Assistant: http://{{ ansible_default_ipv4.address }}:8123"
+          - "WireGuard Server Public Key: {{ wg_public_key_raw.content | b64decode | trim }}"
+          - "Router: UDP-Port {{ wg_port }} auf {{ ansible_default_ipv4.address }} weiterleiten."
+
+  handlers:
+    - name: Restart WireGuard
+      ansible.builtin.service:
+        name: "wg-quick@{{ wg_interface }}"
+        state: restarted

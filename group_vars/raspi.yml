@@ -1,0 +1,16 @@
+---
+timezone: Europe/Berlin
+
+# Home Assistant
+ha_config_dir: /opt/homeassistant/config
+ha_image: ghcr.io/home-assistant/home-assistant:stable
+
+# WireGuard
+wg_interface: wg0
+wg_address: 10.8.0.1/24
+wg_port: 51820
+wg_lan_interface: eth0          # Netzwerkinterface des Pi (eth0 oder wlan0)
+wg_peers:                       # Public Keys deiner Clients (Handy, Laptop, ...)
+  - name: handy
+    public_key: "HIER_PUBLIC_KEY_DES_CLIENTS"
+    allowed_ips: 10.8.0.2/32
