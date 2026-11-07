@@ -1,12 +1,15 @@
-# Raspberry Pi: Home Assistant (Docker) + WireGuard
+# Raspberry Pi: Home Assistant (Docker) + WireGuard-Client zum vServer
 
-Voraussetzung: Raspberry Pi OS Lite (Debian-basiert, 64 oder 32 Bit), SSH aktiv, Ansible auf deinem Rechner.
+Voraussetzung: Raspberry Pi OS Lite, SSH aktiv, Ansible auf deinem Rechner.
 
 ```bash
 ansible-galaxy collection install -r requirements.yml
-# inventory.ini und group_vars/raspi.yml anpassen (Host, WireGuard-Peers, Interface)
-ansible-playbook playbook.yml --ask-pass --ask-become-pass   # oder mit SSH-Key
+# inventory.ini und group_vars/raspi.yml anpassen
+ansible-playbook playbook.yml --ask-pass --ask-become-pass
 ```
 
-Danach: Home Assistant unter `http://<pi-ip>:8123`; auf dem Router UDP 51820 zum Pi weiterleiten.
-Der Server-Public-Key wird am Ende ausgegeben und gehört in die Client-Konfiguration (`Endpoint = <deine-ip-oder-ddns>:51820`).
+1. Das Playbook gibt am Ende den **Public Key des Pi** aus.
+2. Trage ihn auf dem vServer als Peer ein (`AllowedIPs = 10.8.0.2/32`) und lade WireGuard dort neu.
+3. Der Pi verbindet sich mit `PersistentKeepalive = 25`, startet den Tunnel beim Boot und ein Watchdog-Timer prueft jede Minute die Verbindung und baut sie bei Ausfall neu auf.
+
+Home Assistant: `http://<pi-ip>:8123`

@@ -23,9 +23,9 @@
           - gnupg
           - apparmor
           - libcap2-bin
-          - iptables
           - wireguard
           - wireguard-tools
+          - iputils-ping
           - python3-docker
         state: present
 
@@ -91,40 +91,32 @@
           - /etc/localtime:/etc/localtime:ro
           - /run/dbus:/run/dbus:ro
 
-    # ---------- WireGuard ----------
-    - name: IP-Forwarding aktivieren
-      ansible.posix.sysctl:
-        name: net.ipv4.ip_forward
-        value: "1"
-        sysctl_set: true
-        state: present
-        reload: true
-
+    # ---------- WireGuard (Client -> vServer) ----------
     - name: WireGuard-Verzeichnis absichern
       ansible.builtin.file:
         path: /etc/wireguard
         state: directory
         mode: "0700"
 
-    - name: Server-Private-Key generieren (nur falls nicht vorhanden)
-      ansible.builtin.shell: umask 077 && wg genkey > /etc/wireguard/server_private.key
+    - name: Pi-Private-Key generieren (nur falls nicht vorhanden)
+      ansible.builtin.shell: umask 077 && wg genkey > /etc/wireguard/private.key
       args:
-        creates: /etc/wireguard/server_private.key
+        creates: /etc/wireguard/private.key
 
-    - name: Server-Public-Key ableiten
-      ansible.builtin.shell: wg pubkey < /etc/wireguard/server_private.key > /etc/wireguard/server_public.key
+    - name: Pi-Public-Key ableiten
+      ansible.builtin.shell: wg pubkey < /etc/wireguard/private.key > /etc/wireguard/public.key
       args:
-        creates: /etc/wireguard/server_public.key
+        creates: /etc/wireguard/public.key
 
     - name: Private Key einlesen
       ansible.builtin.slurp:
-        src: /etc/wireguard/server_private.key
+        src: /etc/wireguard/private.key
       register: wg_private_key_raw
       no_log: true
 
     - name: Public Key einlesen
       ansible.builtin.slurp:
-        src: /etc/wireguard/server_public.key
+        src: /etc/wireguard/public.key
       register: wg_public_key_raw
 
     - name: WireGuard-Konfiguration schreiben
@@ -139,9 +131,88 @@
       no_log: true
       notify: Restart WireGuard
 
+    - name: Systemd-Drop-in-Verzeichnis anlegen
+      ansible.builtin.file:
+        path: "/etc/systemd/system/wg-quick@{{ wg_interface }}.service.d"
+        state: directory
+        mode: "0755"
+
+    - name: Drop-in - erst nach Netzwerk starten, bei Fehler neu versuchen
+      ansible.builtin.copy:
+        dest: "/etc/systemd/system/wg-quick@{{ wg_interface }}.service.d/override.conf"
+        mode: "0644"
+        content: |
+          [Unit]
+          Wants=network-online.target
+          After=network-online.target nss-lookup.target
+          StartLimitIntervalSec=0
+
+          [Service]
+          Restart=on-failure
+          RestartSec=15
+      notify:
+        - Reload systemd
+        - Restart WireGuard
+
+    - name: Watchdog-Skript installieren
+      ansible.builtin.copy:
+        dest: /usr/local/bin/wg-watchdog.sh
+        mode: "0755"
+        content: |
+          #!/bin/sh
+          # Prueft die Verbindung zum vServer; baut sie bei Ausfall neu auf.
+          IF="{{ wg_interface }}"
+          if ! ip link show "$IF" >/dev/null 2>&1; then
+            systemctl restart "wg-quick@$IF"; exit 0
+          fi
+          if ! ping -c 2 -W 3 -I "$IF" {{ wg_server_tunnel_ip }} >/dev/null 2>&1; then
+            logger -t wg-watchdog "vServer nicht erreichbar, starte $IF neu"
+            systemctl restart "wg-quick@$IF"
+          fi
+
+    - name: Watchdog-Service anlegen
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/wg-watchdog.service
+        mode: "0644"
+        content: |
+          [Unit]
+          Description=WireGuard Verbindungs-Watchdog
+          After=network-online.target
+
+          [Service]
+          Type=oneshot
+          ExecStart=/usr/local/bin/wg-watchdog.sh
+      notify: Reload systemd
+
+    - name: Watchdog-Timer anlegen (jede Minute)
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/wg-watchdog.timer
+        mode: "0644"
+        content: |
+          [Unit]
+          Description=WireGuard Watchdog alle 60s
+
+          [Timer]
+          OnBootSec=2min
+          OnUnitActiveSec=60s
+
+          [Install]
+          WantedBy=timers.target
+      notify: Reload systemd
+
+    - name: Systemd neu laden
+      ansible.builtin.systemd:
+        daemon_reload: true
+
     - name: WireGuard beim Booten aktivieren und starten
       ansible.builtin.service:
         name: "wg-quick@{{ wg_interface }}"
+        state: started
+        enabled: true
+
+    - name: Watchdog-Timer aktivieren
+      ansible.builtin.systemd:
+        name: wg-watchdog.timer
         state: started
         enabled: true
 
@@ -149,10 +220,14 @@
       ansible.builtin.debug:
         msg:
           - "Home Assistant: http://{{ ansible_default_ipv4.address }}:8123"
-          - "WireGuard Server Public Key: {{ wg_public_key_raw.content | b64decode | trim }}"
-          - "Router: UDP-Port {{ wg_port }} auf {{ ansible_default_ipv4.address }} weiterleiten."
+          - "Public Key des Pi (auf dem vServer als Peer eintragen): {{ wg_public_key_raw.content | b64decode | trim }}"
+          - "vServer-Peer: AllowedIPs = {{ wg_address.split('/')[0] }}/32"
 
   handlers:
+    - name: Reload systemd
+      ansible.builtin.systemd:
+        daemon_reload: true
+
     - name: Restart WireGuard
       ansible.builtin.service:
         name: "wg-quick@{{ wg_interface }}"

@@ -1,13 +1,11 @@
 [Interface]
 Address = {{ wg_address }}
-ListenPort = {{ wg_port }}
 PrivateKey = {{ wg_private_key }}
-PostUp = iptables -A FORWARD -i %i -j ACCEPT; iptables -A FORWARD -o %i -j ACCEPT; iptables -t nat -A POSTROUTING -o {{ wg_lan_interface }} -j MASQUERADE
-PostDown = iptables -D FORWARD -i %i -j ACCEPT; iptables -D FORWARD -o %i -j ACCEPT; iptables -t nat -D POSTROUTING -o {{ wg_lan_interface }} -j MASQUERADE
-{% for peer in wg_peers %}
 
-# {{ peer.name }}
 [Peer]
-PublicKey = {{ peer.public_key }}
-AllowedIPs = {{ peer.allowed_ips }}
-{% endfor %}
+# vServer
+PublicKey = {{ wg_server_public_key }}
+Endpoint = {{ wg_server_endpoint }}
+AllowedIPs = {{ wg_allowed_ips }}
+# haelt den Tunnel hinter NAT/Router dauerhaft offen
+PersistentKeepalive = 25
