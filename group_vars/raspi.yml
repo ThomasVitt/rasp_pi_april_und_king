@@ -7,8 +7,8 @@ ha_image: ghcr.io/home-assistant/home-assistant:stable
 
 # WireGuard (Pi baut Verbindung zum vServer auf)
 wg_interface: wg0
-wg_address: 10.8.0.2/24                 # Tunnel-IP des Pi
-wg_server_endpoint: "vserver.example.com:51820"   # oeffentliche IP/Domain + Port des vServers
+wg_address: 10.8.0.5/24                 # Tunnel-IP des Pi
+wg_server_endpoint: "vpn.tvitt.de:51820"   # oeffentliche IP/Domain + Port des vServers
 wg_server_public_key: "fMQNQtg6YTVv0XrWU1TcCAU6CrnDPffxixWpfjDzNAk="
 wg_server_tunnel_ip: 10.8.0.1           # Tunnel-IP des vServers (fuer den Watchdog-Ping)
 # Nur Tunnel-Netz durch den VPN leiten. "0.0.0.0/0" wuerde den gesamten Traffic umleiten.
