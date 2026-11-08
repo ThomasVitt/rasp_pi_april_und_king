@@ -9,7 +9,7 @@ ha_image: ghcr.io/home-assistant/home-assistant:stable
 wg_interface: wg0
 wg_address: 10.8.0.2/24                 # Tunnel-IP des Pi
 wg_server_endpoint: "vserver.example.com:51820"   # oeffentliche IP/Domain + Port des vServers
-wg_server_public_key: "HIER_PUBLIC_KEY_DES_VSERVERS"
+wg_server_public_key: "fMQNQtg6YTVv0XrWU1TcCAU6CrnDPffxixWpfjDzNAk="
 wg_server_tunnel_ip: 10.8.0.1           # Tunnel-IP des vServers (fuer den Watchdog-Ping)
 # Nur Tunnel-Netz durch den VPN leiten. "0.0.0.0/0" wuerde den gesamten Traffic umleiten.
 wg_allowed_ips: 10.8.0.0/24

@@ -1,6 +1,7 @@
 ---
 - name: Home Assistant (Docker) und WireGuard auf Raspberry Pi OS Lite
   hosts: raspi
+  connection: local
   become: true
 
   tasks:
