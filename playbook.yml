@@ -27,6 +27,9 @@
           - wireguard
           - wireguard-tools
           - iputils-ping
+          - bluez                 # Host-Bluetooth-Stack, von HA ueber DBus genutzt
+          - dbus
+          - rfkill
           - python3-docker
         state: present
 
@@ -69,6 +72,21 @@
         groups: docker
         append: true
 
+    # ---------- Bluetooth (Host) ----------
+    - name: Bluetooth nicht per rfkill blockieren
+      ansible.builtin.command: rfkill unblock bluetooth
+      changed_when: false
+      failed_when: false
+
+    - name: DBus und Bluetooth-Dienst aktivieren und starten
+      ansible.builtin.service:
+        name: "{{ item }}"
+        state: started
+        enabled: true
+      loop:
+        - dbus
+        - bluetooth
+
     # ---------- Home Assistant ----------
     - name: Config-Verzeichnis für Home Assistant anlegen
       ansible.builtin.file:
@@ -84,7 +102,10 @@
         state: started
         restart_policy: unless-stopped
         network_mode: host
-        privileged: true          # nötig für USB-Sticks (Zigbee/Z-Wave) und Bluetooth
+        privileged: true          # nötig für USB-Sticks (Zigbee/Z-Wave)
+        capabilities:             # Bluetooth: Raw-Zugriff auf HCI/Netzwerk-Adapter
+          - NET_ADMIN
+          - NET_RAW
         env:
           TZ: "{{ timezone }}"
         volumes:
