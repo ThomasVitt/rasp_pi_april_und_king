@@ -12,4 +12,4 @@ wg_server_endpoint: "vpn.tvitt.de:51820"   # oeffentliche IP/Domain + Port des v
 wg_server_public_key: "fMQNQtg6YTVv0XrWU1TcCAU6CrnDPffxixWpfjDzNAk="
 wg_server_tunnel_ip: 10.8.0.1           # Tunnel-IP des vServers (fuer den Watchdog-Ping)
 # Nur Tunnel-Netz durch den VPN leiten. "0.0.0.0/0" wuerde den gesamten Traffic umleiten.
-wg_allowed_ips: 10.8.0.5/32, 192.168.170.0/24
+wg_allowed_ips: 10.8.0.5/32
