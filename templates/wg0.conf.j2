@@ -1,6 +1,15 @@
 [Interface]
 Address = {{ wg_address }}
 PrivateKey = {{ wg_private_key }}
+{% if wg_lan_forwarding | bool %}
+# Tunnel -> LAN weiterleiten und per NAT als Pi-Adresse ins LAN ausgeben
+PostUp = iptables -I FORWARD 1 -i %i -o {{ wg_lan_interface }} -j ACCEPT
+PostUp = iptables -I FORWARD 1 -i {{ wg_lan_interface }} -o %i -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+PostUp = iptables -t nat -A POSTROUTING -s {{ wg_tunnel_network }} -o {{ wg_lan_interface }} -j MASQUERADE
+PostDown = iptables -D FORWARD -i %i -o {{ wg_lan_interface }} -j ACCEPT
+PostDown = iptables -D FORWARD -i {{ wg_lan_interface }} -o %i -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+PostDown = iptables -t nat -D POSTROUTING -s {{ wg_tunnel_network }} -o {{ wg_lan_interface }} -j MASQUERADE
+{% endif %}
 
 [Peer]
 # vServer

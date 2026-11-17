@@ -33,6 +33,22 @@
         src: /etc/wireguard/public.key
       register: wg_public_key_raw
 
+    - name: iptables installieren (für NAT/Forwarding ins LAN)
+      ansible.builtin.apt:
+        name: iptables
+        state: present
+      when: wg_lan_forwarding | bool
+
+    - name: IP-Forwarding aktivieren
+      ansible.posix.sysctl:
+        name: net.ipv4.ip_forward
+        value: "1"
+        sysctl_file: /etc/sysctl.d/99-wireguard-forward.conf
+        sysctl_set: true
+        state: present
+        reload: true
+      when: wg_lan_forwarding | bool
+
     - name: WireGuard-Konfiguration schreiben
       ansible.builtin.template:
         src: wg0.conf.j2
