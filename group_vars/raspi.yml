@@ -11,11 +11,5 @@ wg_address: 10.8.0.5/24                 # Tunnel-IP des Pi
 wg_server_endpoint: "vpn.tvitt.de:51820"   # oeffentliche IP/Domain + Port des vServers
 wg_server_public_key: "fMQNQtg6YTVv0XrWU1TcCAU6CrnDPffxixWpfjDzNAk="
 wg_server_tunnel_ip: 10.8.0.1           # Tunnel-IP des vServers (fuer den Watchdog-Ping)
-# Ziele, die durch den Tunnel gehen (Tunnel-Netz + entfernte Netze, z. B. Heimnetz).
-# Das lokale Netz des Pi darf hier NICHT stehen - wird vom Playbook automatisch entfernt.
-wg_allowed_ips: 10.8.0.0/24, 192.168.170.0/24
-
-# Tunnel -> LAN (IP-Forwarding + NAT per iptables, wird in wg0.conf als PostUp/PostDown gesetzt)
-wg_lan_forwarding: true
-wg_lan_interface: eth0                  # Interface des Pi im LAN (eth0 oder wlan0)
-wg_tunnel_network: 10.8.0.0/24          # Quelladressen, die ins LAN maskiert werden
+# Ziele, die durch den Tunnel gehen. Das lokale Netz des Pi gehoert hier NICHT hinein.
+wg_allowed_ips: 10.8.0.0/24
