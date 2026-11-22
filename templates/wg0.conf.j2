@@ -15,6 +15,6 @@ PostDown = iptables -t nat -D POSTROUTING -s {{ wg_tunnel_network }} -o {{ wg_la
 # vServer
 PublicKey = {{ wg_server_public_key }}
 Endpoint = {{ wg_server_endpoint }}
-AllowedIPs = {{ wg_allowed_ips }}
+AllowedIPs = {{ wg_allowed_ips_effective }}
 # haelt den Tunnel hinter NAT/Router dauerhaft offen
 PersistentKeepalive = 25

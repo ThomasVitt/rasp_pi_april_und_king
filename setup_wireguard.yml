@@ -33,6 +33,23 @@
         src: /etc/wireguard/public.key
       register: wg_public_key_raw
 
+    - name: Eigenes LAN des Pi ermitteln
+      ansible.builtin.set_fact:
+        wg_local_lan: >-
+          {{ ansible_facts[wg_lan_interface].ipv4.network }}/{{ ansible_facts[wg_lan_interface].ipv4.prefix }}
+
+    - name: Eigenes LAN aus den AllowedIPs entfernen (sonst läuft lokaler Verkehr in den Tunnel)
+      ansible.builtin.set_fact:
+        wg_allowed_ips_effective: >-
+          {{ wg_allowed_ips.split(',') | map('trim') | reject('equalto', wg_local_lan) | join(', ') }}
+
+    - name: Hinweis, falls das eigene LAN entfernt wurde
+      ansible.builtin.debug:
+        msg: >-
+          {{ wg_local_lan }} ist das lokale Netz des Pi ({{ wg_lan_interface }}) und wurde aus den
+          AllowedIPs entfernt. Verwendet wird: {{ wg_allowed_ips_effective }}
+      when: wg_allowed_ips_effective != (wg_allowed_ips.split(',') | map('trim') | join(', '))
+
     - name: iptables installieren (für NAT/Forwarding ins LAN)
       ansible.builtin.apt:
         name: iptables
