@@ -33,6 +33,16 @@
         src: /etc/wireguard/public.key
       register: wg_public_key_raw
 
+    - name: Sicherstellen, dass das LAN des Pi nicht in den AllowedIPs steht
+      ansible.builtin.assert:
+        that:
+          - wg_lan_network not in (wg_allowed_ips.split(',') | map('trim') | list)
+        fail_msg: >-
+          {{ wg_lan_network }} ist das LAN des Pi und darf nicht in wg_allowed_ips stehen,
+          sonst wird das lokale Netz in den Tunnel geroutet. Es gehoert auf den vServer
+          (Peer des Pi) und auf die Clients wie den Mac.
+      when: wg_lan_forwarding | bool
+
     - name: iptables installieren (für NAT/Forwarding ins LAN)
       ansible.builtin.apt:
         name: iptables
@@ -151,7 +161,8 @@
         msg:
           - "Home Assistant: http://{{ ansible_default_ipv4.address }}:8123"
           - "Public Key des Pi (auf dem vServer als Peer eintragen): {{ wg_public_key_raw.content | b64decode | trim }}"
-          - "vServer-Peer: AllowedIPs = {{ wg_address.split('/')[0] }}/32"
+          - "vServer, Peer des Pi: AllowedIPs = {{ wg_address.split('/')[0] }}/32{{ (', ' ~ wg_lan_network) if wg_lan_forwarding | bool else '' }}"
+          - "Clients (z. B. Mac), Peer vServer: AllowedIPs = {{ wg_tunnel_network }}{{ (', ' ~ wg_lan_network) if wg_lan_forwarding | bool else '' }}"
 
   handlers:
     - name: Reload systemd

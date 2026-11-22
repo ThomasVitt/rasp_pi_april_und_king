@@ -13,3 +13,9 @@ wg_server_public_key: "fMQNQtg6YTVv0XrWU1TcCAU6CrnDPffxixWpfjDzNAk="
 wg_server_tunnel_ip: 10.8.0.1           # Tunnel-IP des vServers (fuer den Watchdog-Ping)
 # Ziele, die durch den Tunnel gehen. Das lokale Netz des Pi gehoert hier NICHT hinein.
 wg_allowed_ips: 10.8.0.0/24
+
+# Tunnel -> LAN (IP-Forwarding + NAT per iptables, wird in wg0.conf als PostUp/PostDown gesetzt)
+wg_lan_forwarding: true
+wg_lan_interface: eth0                  # Interface des Pi im LAN (eth0 oder wlan0)
+wg_tunnel_network: 10.8.0.0/24          # Quelladressen, die ins LAN maskiert werden
+wg_lan_network: 192.168.170.0/24        # LAN hinter dem Pi (Fritzbox, Kameras), per Tunnel erreichbar
